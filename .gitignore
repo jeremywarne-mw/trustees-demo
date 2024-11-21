@@ -1,5 +1,5 @@
 output
-pdfs
+pdfs/*
 pdfs-other
 .env
 cache.json
