@@ -77,8 +77,6 @@ const processPdf = async (filePath) => {
 
     const { text } = data;
 
-    console.log(text);
-
     const prompt = `
         Respond in JSON format.
 
@@ -107,8 +105,8 @@ const processPdf = async (filePath) => {
         If it's a bank/credit card statement, add the following fields:
         1. startingBalance
         2. closingBalance
-        3. csv: A CSV formatted string with headers: Date, Transaction Detail, Deposit, Withdrawal, Skip. Enclose transaction detail in double quotes if it contains commas. Format deposit and withdrawal as floats with no $ or , characters
-        Skip should be true if the transaction is a transfer or credit card payment, or an opening or closing balance row.
+        3. csv: A CSV formatted string with headers: Date, Transaction Detail, Income, Expenditure, Skip. Enclose transaction detail in double quotes if it contains commas. Format expenditure and income as floats with no $ or , characters
+        Skip should be true if the transaction is a transfer or a payment into a credit card account, or an opening or closing balance row.
 
         ---
         ${text}
@@ -127,7 +125,6 @@ const processPdf = async (filePath) => {
     };
 
     const response = await cachedPost(`${azureEndpoint}`, body, headers);
-    console.log(JSON.stringify(response.choices[0].message.content, null, 2));
     return JSON.parse(response.choices[0].message.content);
 };
 
@@ -137,8 +134,8 @@ const writeCsv = async (data, outputPath) => {
         header: [
             { id: 'Date', title: 'Date' },
             { id: 'TransactionDetail', title: 'Transaction Detail' },
-            { id: 'Deposit', title: 'Deposit' },
-            { id: 'Withdrawal', title: 'Withdrawal' },
+            { id: 'Income', title: 'Income' },
+            { id: 'Expenditure', title: 'Expenditure' },
             { id: 'Filename', title: 'File name' },
         ],
         alwaysQuote: true,
@@ -161,7 +158,6 @@ function parseCsvLine(line) {
 
 const processPdfsInFolder = async () => {
     try {
-        console.log('here');
         await fs.mkdir(outputFolder, { recursive: true });
 
         const files = await fs.readdir(pdfFolder);
@@ -195,14 +191,14 @@ const processPdfsInFolder = async () => {
                     const csvData = dataRows.map((line) => {
                         if (!line.trim()) return null; // Skip empty lines
 
-                        const [TransactionDate, TransactionDetail, Deposit, Withdrawal, Skip] = parseCsvLine(line.replace(', "', ',"')); // Remove space after comma
+                        const [TransactionDate, TransactionDetail, Income, Expenditure, Skip] = parseCsvLine(line.replace(', "', ',"')); // Remove space after comma
 
                         if (Skip === 'true') return null; // Skip rows marked as transfers or opening/closing balances
 
                         return { 
                             Date: TransactionDate, // Parse the date for sorting
                             Filename: file,
-                            TransactionDetail, Deposit, Withdrawal, 
+                            TransactionDetail, Income, Expenditure, 
                         };
                     }).filter(Boolean); // Remove null entries
 
