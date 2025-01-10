@@ -1,6 +1,5 @@
 import fs from 'fs/promises';
 import path from 'path';
-import pdf from "pdf-parse";
 import { parse } from 'csv-parse/sync';
 import axios from 'axios';
 import { createObjectCsvWriter } from 'csv-writer';
@@ -21,8 +20,8 @@ try {
 
 dotenv.config();
 
-const pdfFolder = './pdfs';
-const outputFolder = './output';
+const sourceFolder = process.argv[2];
+const outputFolder = sourceFolder;
 
 const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT; // e.g., https://<resource-name>.openai.azure.com
 const azureApiKey = process.env.AZURE_API_KEY;
@@ -69,35 +68,13 @@ async function saveCache() {
     }
   }
 
-const processPdf = async (filePath) => {
-    const data = await pdf(filePath);
-
-    const { text } = data;
+const processText = async (filePath) => {
+    const text = await fs.readFile(filePath, 'utf8');
 
     const prompt = `
         Respond in JSON format.
 
-        Analyze the following text and determine the category from among the following:
-        
-        Bank account statement
-        Credit card statement
-        Identification method
-        Statutory declaration
-        A letter from WINZ advising the breakdown of any benefit amount paid to you.
-        A letter from WINZ declining your request for WINZ financial assistance
-        Other supporting documentation
-        Evidence of a debt payment plan
-        A letter from a lending institution, who have declined a request from you for a financial loan.
-        A payslip
-        A copy of a letter from your employer informing you that your hours have been reduced
-        A redundancy notice
-        A rental agreement
-        A rent arrears notice
-        A mortgage arrears notice
-        A mortgage statement
-        A loan statement
-
-        The response JSON should contain the category of the document in a field called "category".
+        Analyze the following text and respond with a JSON object containing the following fields:
 
         If it's a bank/credit card statement, add the following fields:
         1. startingBalance
@@ -153,20 +130,20 @@ function parseCsvLine(line) {
     return records[0];
   }
 
-const processPdfsInFolder = async () => {
+const processSourceFilesInFolder = async () => {
     try {
         await fs.mkdir(outputFolder, { recursive: true });
 
-        const files = await fs.readdir(pdfFolder);
+        const files = await fs.readdir(sourceFolder);
         
         const consolidatedData = [];
         let consolidatedHeaderRow = null; // Store the header row
 
         for (const file of files) {
-            if (path.extname(file).toLowerCase() === '.pdf') {
+            if (path.match(/_raw_ocr\.txt$/)) {
                 console.log(`\n\n***********************\n\nProcessing: ${file}`);
-                const filePath = path.join(pdfFolder, file);
-                const result = await processPdf(filePath);
+                const filePath = path.join(sourceFolder, file);
+                const result = await processText(filePath);
 
                 const { category, startingBalance, closingBalance, csv } = result;
 
@@ -217,8 +194,8 @@ const processPdfsInFolder = async () => {
         }
 
     } catch (error) {
-        console.error('Error processing PDFs:', error);
+        console.error('Error processing files:', error);
     }
 };
 
-processPdfsInFolder();
+processSourceFilesInFolder();
